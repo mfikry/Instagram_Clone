@@ -7,7 +7,9 @@ const prisma = new PrismaClient();
 export const toggleLike = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
-    const { postId } = req.params; // Ambil ID postingan dari URL param
+    
+    // FIX 1: Tegaskan ke TypeScript bahwa postId pasti sebuah string
+    const { postId } = req.params as { postId: string }; 
 
     if (!userId) {
       res.status(401).json({ success: false, message: 'Akses ditolak.' });
@@ -22,7 +24,7 @@ export const toggleLike = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     // 2. Cek apakah user sudah pernah nge-like postingan ini
-    const existingLike = await prisma.like.findFirst({
+    const existingLike = await prisma.postLike.findFirst({
       where: {
         userId: userId,
         postId: postId,
@@ -30,14 +32,18 @@ export const toggleLike = async (req: AuthRequest, res: Response): Promise<void>
     });
 
     if (existingLike) {
-      // 3. Kalau udah ada like-nya, berarti user minta UNLIKE (Hapus data Like)
-      await prisma.like.delete({
-        where: { id: existingLike.id },
+      // 3. Kalau udah ada like-nya, berarti user minta UNLIKE
+      // FIX 2: Pakai deleteMany biar ga perlu nyari kolom 'id' di tabel PostLike
+      await prisma.postLike.deleteMany({
+        where: { 
+          userId: userId,
+          postId: postId
+        },
       });
       res.status(200).json({ success: true, message: 'Berhasil unlike postingan.', isLiked: false });
     } else {
       // 4. Kalau belum ada, berarti user minta LIKE (Buat data Like baru)
-      await prisma.like.create({
+      await prisma.postLike.create({
         data: {
           userId: userId,
           postId: postId,
