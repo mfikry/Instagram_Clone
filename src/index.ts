@@ -37,6 +37,15 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
-});
+// Bagian app.use, routes, dll tetap sama...
+
+// UBAH bagian paling bawah:
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+// WAJIB tambahkan ini untuk Vercel:
+export default app;
