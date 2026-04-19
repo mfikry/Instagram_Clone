@@ -42,24 +42,40 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
   }
 };
 // Bikin middleware baru yang nggak galak
-export const optionalAuth = (req: any, res: any, next: any) => {
+// Bikin middleware baru yang nggak galak (JADIKAN ASYNC karena nembak API Supabase)
+export const optionalAuth = async (req: any, res: any, next: any) => {
+  // Cek dua tempat: dari Header (Axios) atau dari Cookies langsung
   const authHeader = req.headers.authorization;
+  const tokenFromCookie = req.cookies ? req.cookies.token : null; 
   
+  let token = null;
+
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
+    token = authHeader.split(' ')[1];
+  } else if (tokenFromCookie) {
+    token = tokenFromCookie;
+  }
+  
+  if (token) {
     try {
-      // Coba baca tokennya (sesuaikan dengan JWT_SECRET lu)
-      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-      // Ambil ID-nya (biasanya disimpan di .userId atau .sub)
-      req.userId = decoded.userId || decoded.sub;
-    } catch (error) {
-      // Kalau token kedaluwarsa atau salah, biarin aja (jangan di-throw error)
+      // FIX UTAMA: Pakai cara Supabase persis kayak di requireAuth!
+      const { data, error } = await supabase.auth.getUser(token);
+      
+      if (error || !data.user) {
+        console.error("❌ [optionalAuth] Token ditolak Supabase:", error?.message);
+        req.userId = null;
+      } else {
+        // Berhasil!
+        req.userId = data.user.id; 
+        
+      }
+      
+    } catch (error: any) {
       req.userId = null;
     }
   } else {
-    // Kalau nggak bawa token sama sekali, anggap aja tamu/guest
     req.userId = null; 
   }
   
-  next(); // Lanjutin perjalanan! Nggak ada res.status(401) di sini.
+  next(); // Lanjutin perjalanan!
 };

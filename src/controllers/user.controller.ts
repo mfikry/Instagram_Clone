@@ -67,9 +67,11 @@ export const getUserProfile = async (req: any, res: any): Promise<void> => {
     let followStatus = null;
     let isOwnProfile = false;
 
-    // LOGIKA CERDAS: Cuma jalanin cek database kalau yang buka punya akun (Login)
+    // LOGIKA CERDAS: Cuma jalanin cek kalau yang buka punya akun (Login)
     if (currentUserId) {
-      isOwnProfile = currentUserId === user.id;
+      // FIX UTAMA 2: Bungkus pakai String() biar pasti cocok 100%
+      isOwnProfile = String(currentUserId) === String(user.id);
+      
       const follow = await prisma.follow.findFirst({
         where: { followerId: currentUserId, followingId: user.id }
       });
