@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken'; 
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -39,4 +40,26 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
   } catch (error) {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat verifikasi.' });
   }
+};
+// Bikin middleware baru yang nggak galak
+export const optionalAuth = (req: any, res: any, next: any) => {
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      // Coba baca tokennya (sesuaikan dengan JWT_SECRET lu)
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+      // Ambil ID-nya (biasanya disimpan di .userId atau .sub)
+      req.userId = decoded.userId || decoded.sub;
+    } catch (error) {
+      // Kalau token kedaluwarsa atau salah, biarin aja (jangan di-throw error)
+      req.userId = null;
+    }
+  } else {
+    // Kalau nggak bawa token sama sekali, anggap aja tamu/guest
+    req.userId = null; 
+  }
+  
+  next(); // Lanjutin perjalanan! Nggak ada res.status(401) di sini.
 };

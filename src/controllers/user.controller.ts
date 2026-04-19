@@ -45,3 +45,129 @@ export const getMyProfile = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server.' });
   }
 };
+export const getUserProfile = async (req: any, res: any): Promise<void> => {
+  try {
+    const targetUsername = req.params.username;
+    const currentUserId = req.userId; // SEKARANG BISA NULL KALAU DIA GUEST
+
+    const user = await prisma.user.findUnique({
+      where: { username: targetUsername },
+      include: {
+        _count: { select: { posts: true, followers: true, following: true } }
+      }
+    });
+
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+      return;
+    }
+
+    // Default status buat tamu/guest
+    let isFollowing = false;
+    let followStatus = null;
+    let isOwnProfile = false;
+
+    // LOGIKA CERDAS: Cuma jalanin cek database kalau yang buka punya akun (Login)
+    if (currentUserId) {
+      isOwnProfile = currentUserId === user.id;
+      const follow = await prisma.follow.findFirst({
+        where: { followerId: currentUserId, followingId: user.id }
+      });
+      if (follow) {
+        isFollowing = follow.status === 'ACCEPTED';
+        followStatus = follow.status;
+      }
+    }
+
+    const isPrivate = user.isPrivate && !isOwnProfile && !isFollowing;
+
+    // Tarik postingan kalau bukan private
+    let posts: any[] = [];
+    if (!isPrivate) {
+      posts = await prisma.post.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          media: true,
+          _count: { select: { likes: true, comments: true } }
+        }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        profile: user,
+        relationship: { isOwnProfile, isFollowing, followStatus },
+        isPrivate,
+        posts
+      }
+    });
+  } catch (error) {
+    console.error('Error getUserProfile:', error);
+    res.status(500).json({ success: false, message: 'Gagal memuat profil' });
+  }
+};
+export const searchUsers = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const query = req.query.q as string;
+    
+    // Kalau kolom pencarian kosong, balikin array kosong aja
+    if (!query) {
+      res.status(200).json({ success: true, data: [] });
+      return;
+    }
+
+    // Cari user yang username-nya mengandung huruf yang diketik
+    const users = await prisma.user.findMany({
+      where: {
+        username: {
+          contains: query,
+          mode: 'insensitive', // Huruf besar/kecil ga masalah (Aman)
+        },
+      },
+      take: 10, // Batasi 10 hasil maksimal biar enteng
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        avatarUrl: true,
+      },
+    });
+
+    res.status(200).json({ success: true, data: users });
+  } catch (error: any) {
+    console.error('Error searchUsers:', error);
+    res.status(500).json({ success: false, message: 'Gagal mencari user' });
+  }
+};
+export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId;
+
+    // FIX 1: Yakinkan TypeScript kalau userId itu PASTI ada
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Akses ditolak.' });
+      return;
+    }
+
+    const { fullName, bio } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        fullName: fullName || undefined, 
+        bio: bio || undefined 
+      }
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Profil berhasil diperbarui', 
+      data: updatedUser 
+    });
+  } catch (error) {
+    console.error('Error updateProfile:', error);
+    res.status(500).json({ success: false, message: 'Gagal memperbarui profil' });
+  }
+};

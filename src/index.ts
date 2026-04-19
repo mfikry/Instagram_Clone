@@ -8,6 +8,8 @@ import feedRoutes from './routes/feed.routes';
 import likeRoutes from './routes/like.routes';
 import commentRoutes from './routes/comment.routes';
 import followRoutes from './routes/follow.routes';
+import path from 'path';
+
 
 dotenv.config();
 
@@ -30,6 +32,7 @@ app.use('/api/feed', feedRoutes);
 app.use('/api/likes', likeRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/follows', followRoutes);
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.listen(PORT, () => {
   console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
