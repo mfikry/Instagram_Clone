@@ -17,7 +17,13 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({
+  origin: [
+    'http://localhost:3000', 
+    process.env.FRONTEND_URL || '' // Nanti kita isi kalau Frontend udah live
+  ],
+  credentials: true, 
+}));
 app.use(express.json()); 
 
 // Endpoint untuk test koneksi
@@ -34,8 +40,13 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Bagian app.use, routes, dll tetap sama...
+// UBAH bagian paling bawah ini:
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server berjalan di http://localhost:${PORT}`);}
-);
+// WAJIB DITAMBAHKAN BIAR VERCEL BISA BACA:
+export default app;
