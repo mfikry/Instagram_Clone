@@ -91,7 +91,8 @@ export const getUserProfile = async (req: any, res: any): Promise<void> => {
         orderBy: { createdAt: 'desc' },
         include: {
           media: true,
-          _count: { select: { likes: true, comments: true } }
+          _count: { select: { likes: true, comments: true } },
+          likes: currentUserId ? { where: { userId: currentUserId } } : false
         }
       });
     }

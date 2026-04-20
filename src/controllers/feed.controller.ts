@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 export const getFeed = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId;
+    const currentUserId = req.userId;
     if (!userId) {
       res.status(401).json({ success: false, message: 'Akses ditolak.' });
       return;
@@ -49,7 +50,9 @@ export const getFeed = async (req: AuthRequest, res: Response): Promise<void> =>
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
         media: { orderBy: { order: 'asc' } },
-        _count: { select: { likes: true, comments: true } }
+        _count: { select: { likes: true, comments: true } },
+        
+        likes: currentUserId ? { where: { userId: currentUserId } } : false
       }
     });
 

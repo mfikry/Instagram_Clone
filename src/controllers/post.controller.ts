@@ -52,13 +52,17 @@ export const createPost = async (req: AuthRequest, res: Response): Promise<void>
 export const getPostById = async (req: any, res: any): Promise<void> => {
   try {
     const { id } = req.params;
+    const currentUserId = req.userId; // Ambil ID user yang lagi login
     
     const post = await prisma.post.findUnique({
       where: { id },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
         media: { orderBy: { order: 'asc' } },
-        _count: { select: { likes: true, comments: true } }
+        _count: { select: { likes: true, comments: true } },
+        
+        // ✨ TAMBAHKAN BARIS INI: Cek apakah current user udah nge-like
+        likes: currentUserId ? { where: { userId: currentUserId } } : false
       }
     });
 
