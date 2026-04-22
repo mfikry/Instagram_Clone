@@ -1,7 +1,8 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
-
+import sharp from 'sharp';
+import { createClient } from '@supabase/supabase-js';
 const prisma = new PrismaClient();
 
 export const getMyProfile = async (req: AuthRequest, res: Response) => {
@@ -144,24 +145,62 @@ export const searchUsers = async (req: AuthRequest, res: Response): Promise<void
     res.status(500).json({ success: false, message: 'Gagal mencari user' });
   }
 };
-export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+// Inisialisasi Supabase (Taruh di luar fungsi)
+const supabase = createClient(
+  process.env.SUPABASE_URL as string,
+  process.env.SUPABASE_SERVICE_ROLE_KEY as string
+);
+
+export const updateProfile = async (req: any, res: any): Promise<void> => {
   try {
     const userId = req.userId;
 
-    // FIX 1: Yakinkan TypeScript kalau userId itu PASTI ada
     if (!userId) {
       res.status(401).json({ success: false, message: 'Akses ditolak.' });
       return;
     }
 
     const { fullName, bio } = req.body;
+    let updateData: any = { 
+      fullName: fullName || undefined, 
+      bio: bio || undefined 
+    };
 
+    // --- LOGIKA UPLOAD AVATAR ---
+    if (req.file) {
+      // 1. Kompres dan potong kotak 1:1
+      const optimizedBuffer = await sharp(req.file.buffer)
+        .resize(400, 400, { fit: 'cover' }) 
+        .jpeg({ quality: 80 })
+        .toBuffer();
+
+      const fileName = `avatar-${userId}-${Date.now()}.jpg`;
+
+      // 2. Upload ke Supabase
+      const { error: uploadError } = await supabase.storage
+        .from('media') // Pastikan nama bucket lu bener 'media'
+        .upload(fileName, optimizedBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error("Gagal upload avatar:", uploadError);
+        res.status(500).json({ success: false, message: 'Gagal mengupload foto profil' });
+        return;
+      }
+
+      // 3. Ambil URL Publik
+      const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
+      
+      // 4. Masukin URL ke data yang mau di-update
+      updateData.avatarUrl = publicUrl;
+    }
+
+    // --- SIMPAN KE DATABASE ---
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { 
-        fullName: fullName || undefined, 
-        bio: bio || undefined 
-      }
+      data: updateData,
     });
 
     res.status(200).json({ 

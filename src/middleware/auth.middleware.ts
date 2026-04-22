@@ -41,7 +41,7 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat verifikasi.' });
   }
 };
-// Bikin middleware baru yang nggak galak
+
 // Bikin middleware baru yang nggak galak (JADIKAN ASYNC karena nembak API Supabase)
 export const optionalAuth = async (req: any, res: any, next: any) => {
   // Cek dua tempat: dari Header (Axios) atau dari Cookies langsung

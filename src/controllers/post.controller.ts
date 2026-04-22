@@ -1,10 +1,16 @@
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
+import sharp from 'sharp';
+import { createClient } from '@supabase/supabase-js';
 
 const prisma = new PrismaClient();
-
-export const createPost = async (req: AuthRequest, res: Response): Promise<void> => {
+// Inisialisasi Supabase Client
+const supabase = createClient(
+  process.env.SUPABASE_URL as string,
+  process.env.SUPABASE_SERVICE_ROLE_KEY as string
+);
+export const createPost = async (req: any, res: any): Promise<void> => {
   try {
     const userId = req.userId;
     const { caption } = req.body;
@@ -14,25 +20,50 @@ export const createPost = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // req.file ini otomatis diisi sama Multer kalau ada gambar yang dikirim
+    // Cek apakah ada file (karena kita pakai memoryStorage, file ada di req.file.buffer)
     if (!req.file) {
       res.status(400).json({ success: false, message: 'Gambar wajib diupload!' });
       return;
     }
 
-    // Bikin URL lengkap biar bisa dibaca Frontend (Next.js)
-    const imageUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+    // --- PROSES OPTIMASI GAMBAR (SHARP) ---
+    // Kita perkecil resolusi dan kompres kualitasnya di sini
+    const optimizedBuffer = await sharp(req.file.buffer)
+      .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true }) // Maksimal 1080px
+      .jpeg({ quality: 80 }) // Kompres ke JPEG kualitas 80%
+      .toBuffer();
 
-    // Simpan ke Database
+    // Buat nama file unik
+    const fileName = `${userId}-${Date.now()}.jpg`;
+
+    // --- PROSES UPLOAD KE SUPABASE STORAGE ---
+    const { data, error: uploadError } = await supabase.storage
+      .from('media') // Nama bucket yang lu buat di Supabase
+      .upload(fileName, optimizedBuffer, {
+        contentType: 'image/jpeg',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Supabase Upload Error:', uploadError);
+      res.status(500).json({ success: false, message: 'Gagal upload ke cloud storage.' });
+      return;
+    }
+
+    // Ambil Public URL-nya
+    const { data: { publicUrl } } = supabase.storage
+      .from('media')
+      .getPublicUrl(fileName);
+
+    // --- SIMPAN KE DATABASE PRISMA ---
     const newPost = await prisma.post.create({
       data: {
         userId: userId,
-        caption: caption,
-        // Kerennya Prisma: Langsung simpan relasi ke tabel PostMedia
+        caption: caption || '',
         media: {
           create: [
             {
-              url: imageUrl,
+              url: publicUrl,
               type: 'IMAGE',
             }
           ]
@@ -43,7 +74,12 @@ export const createPost = async (req: AuthRequest, res: Response): Promise<void>
       }
     });
 
-    res.status(201).json({ success: true, message: 'Postingan berhasil dibuat!', data: newPost });
+    res.status(201).json({
+      success: true, 
+      message: 'Postingan berhasil dibuat & dioptimasi!', 
+      data: newPost 
+    });
+
   } catch (error: any) {
     console.error('Error createPost:', error);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan saat membuat postingan.' });
