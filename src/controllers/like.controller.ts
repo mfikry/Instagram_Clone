@@ -33,13 +33,25 @@ export const toggleLike = async (req: AuthRequest, res: Response): Promise<void>
 
     if (existingLike) {
       // 3. Kalau udah ada like-nya, berarti user minta UNLIKE
-      // FIX 2: Pakai deleteMany biar ga perlu nyari kolom 'id' di tabel PostLike
       await prisma.postLike.deleteMany({
         where: { 
           userId: userId,
           postId: postId
         },
       });
+
+      // ✨ HAPUS NOTIFIKASI (Biar nggak ada notif hantu kalau di-unlike)
+      if (post.userId !== userId) {
+        await prisma.notification.deleteMany({
+          where: {
+            userId: post.userId,
+            actorId: userId,
+            type: 'LIKE_POST',
+            entityId: postId
+          }
+        });
+      }
+
       res.status(200).json({ success: true, message: 'Berhasil unlike postingan.', isLiked: false });
     } else {
       // 4. Kalau belum ada, berarti user minta LIKE (Buat data Like baru)
@@ -49,6 +61,20 @@ export const toggleLike = async (req: AuthRequest, res: Response): Promise<void>
           postId: postId,
         },
       });
+
+      // ✨ CCTV NOTIFIKASI DI SINI ✨
+      // Syarat: Jangan kirim notif kalau user nge-like postingannya sendiri
+      if (post.userId !== userId) {
+        await prisma.notification.create({
+          data: {
+            userId: post.userId, // Penerima (yang punya post)
+            actorId: userId,     // Pelaku (yang nge-like)
+            type: 'LIKE_POST',   // Sesuai ENUM di schema
+            entityId: postId     // ID postingan yang dilike
+          }
+        });
+      }
+
       res.status(200).json({ success: true, message: 'Berhasil like postingan.', isLiked: true });
     }
 

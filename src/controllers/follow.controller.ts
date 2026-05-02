@@ -46,6 +46,16 @@ export const toggleFollow = async (req: AuthRequest, res: Response): Promise<voi
           }
         }
       });
+
+      // ✨ HAPUS NOTIFIKASI (Tarik balik notif kalau di-unfollow/batal follow)
+      await prisma.notification.deleteMany({
+        where: {
+          userId: targetUserId,
+          actorId: followerId,
+          type: 'FOLLOW'
+        }
+      });
+
       res.status(200).json({ success: true, message: 'Berhasil unfollow.', isFollowing: false });
     } else {
       // 4. Kalau belum follow, tentukan status berdasarkan privasi akun target
@@ -56,6 +66,16 @@ export const toggleFollow = async (req: AuthRequest, res: Response): Promise<voi
           followerId: followerId,
           followingId: targetUserId,
           status: followStatus
+        }
+      });
+
+      // ✨ CCTV NOTIFIKASI DI SINI ✨
+      await prisma.notification.create({
+        data: {
+          userId: targetUserId,   // Penerima (akun yang di-follow)
+          actorId: followerId,    // Pelaku (yang nge-follow)
+          type: 'FOLLOW',         // Sesuai ENUM
+          // entityId nggak perlu diisi buat Follow, karena actorId udah cukup ngasih tau siapa pelakunya
         }
       });
 

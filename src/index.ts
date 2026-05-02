@@ -8,6 +8,7 @@ import feedRoutes from './routes/feed.routes';
 import likeRoutes from './routes/like.routes';
 import commentRoutes from './routes/comment.routes';
 import followRoutes from './routes/follow.routes';
+import notificationRoutes from './routes/notification.routes';
 import path from 'path';
 
 
@@ -39,6 +40,7 @@ app.use('/api/likes', likeRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/api/notifications', notificationRoutes);
 
 // UBAH bagian paling bawah ini:
 if (process.env.NODE_ENV !== 'production') {

@@ -33,7 +33,7 @@ export const addComment = async (req: AuthRequest, res: Response): Promise<void>
     // Simpan komentar ke database
     const newComment = await prisma.comment.create({
       data: {
-        content: content, // FIX: Pakai 'content'
+        content: content, 
         userId: userId,
         postId: postId,
       },
@@ -42,6 +42,19 @@ export const addComment = async (req: AuthRequest, res: Response): Promise<void>
       }
     });
 
+    // ✨ CCTV NOTIFIKASI DI SINI ✨
+    // Syarat: Jangan kirim notif kalau user komentar di postingannya sendiri
+    if (post.userId !== userId) {
+      await prisma.notification.create({
+        data: {
+          userId: post.userId,   // Penerima (yang punya postingan)
+          actorId: userId,       // Pelaku (yang nulis komentar)
+          type: 'COMMENT',       // Sesuai ENUM
+          entityId: postId       // Simpan ID postingan biar nanti notifnya bisa diklik menuju postingan
+        }
+      });
+    }
+
     res.status(201).json({ success: true, message: 'Berhasil menambahkan komentar.', data: newComment });
   } catch (error: any) {
     console.error('Error addComment:', error);
@@ -49,7 +62,7 @@ export const addComment = async (req: AuthRequest, res: Response): Promise<void>
   }
 };
 
-// Fungsi 2: Ambil Daftar Komentar
+// Fungsi 2: Ambil Daftar Komentar (Nggak ada perubahan, biarin aja)
 export const getCommentsByPost = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { postId } = req.params as { postId: string };
